@@ -5,7 +5,7 @@ import { Search, Plus, Eye, Printer, FileText, X, Save, Edit2, Trash2 } from "lu
 import { supabase } from "@/utils/supabase";
 import { useNotification } from "@/components/providers/NotificationProvider";
 import { useAuth } from "@/components/providers/AuthProvider";
-import { numberToWords } from "@/utils/numberToWords";
+
 
 interface Destruction {
   id: string;

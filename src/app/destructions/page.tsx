@@ -345,9 +345,9 @@ export default function DestructionsPage() {
     iframe.style.display = 'none';
     document.body.appendChild(iframe);
     
-    iframe.document?.open();
-    iframe.document?.write(html);
-    iframe.document?.close();
+    iframe.contentDocument?.open();
+    iframe.contentDocument?.write(html);
+    iframe.contentDocument?.close();
     
     setTimeout(() => {
       iframe.contentWindow?.focus();

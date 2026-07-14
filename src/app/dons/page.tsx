@@ -159,7 +159,7 @@ export default function DonsPage() {
           <title>Bon de Don - ${don.don_number}</title>
           <style>
             @page {
-              size: 148mm 210mm;
+              size: A5 portrait;
               margin: 0;
             }
             body { 

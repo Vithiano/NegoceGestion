@@ -169,7 +169,7 @@ export default function AchatsPage() {
           <title>Bon de Réception ${purchase.purchase_number}</title>
           <style>
             @page {
-              size: 148mm 210mm;
+              size: A5 portrait;
               margin: 10mm;
             }
             body { 

@@ -60,6 +60,7 @@ export default function FacturationPage() {
   const [editingInvoiceId, setEditingInvoiceId] = useState<string | null>(null);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
+  const [selectedInvoiceIds, setSelectedInvoiceIds] = useState<string[]>([]);
   
   const { showNotification, showConfirm } = useNotification();
 
@@ -161,6 +162,49 @@ export default function FacturationPage() {
     });
   };
 
+  const handleBulkDelete = () => {
+    if (selectedInvoiceIds.length === 0) return;
+    
+    showConfirm(`Voulez-vous vraiment supprimer ${selectedInvoiceIds.length} facture(s) sélectionnée(s) ?`, async () => {
+      try {
+        const invoicesToDelete = invoices.filter(inv => selectedInvoiceIds.includes(inv.id));
+        const validatedIds = invoicesToDelete.filter(inv => inv.status === 'VALIDATED').map(inv => inv.id);
+
+        if (validatedIds.length > 0) {
+          await supabase.from("stock_movements").delete().in("reference_id", validatedIds);
+          await supabase.from("journal_entries").delete().in("reference_id", validatedIds);
+        }
+
+        const { error } = await supabase.from("invoices").delete().in("id", selectedInvoiceIds);
+        if (error) throw error;
+
+        fetchInvoices();
+        setSelectedInvoiceIds([]);
+        showNotification(`${selectedInvoiceIds.length} facture(s) supprimée(s).`, "success");
+      } catch (error: any) {
+        showNotification("Erreur lors de la suppression multiple.", "error");
+      }
+    });
+  };
+
+  const toggleSelectAll = () => {
+    const filtered = invoices.filter(inv => 
+      inv.invoice_number.toLowerCase().includes(search.toLowerCase()) || 
+      inv.clients?.name.toLowerCase().includes(search.toLowerCase())
+    );
+    if (selectedInvoiceIds.length === filtered.length && filtered.length > 0) {
+      setSelectedInvoiceIds([]);
+    } else {
+      setSelectedInvoiceIds(filtered.map(i => i.id));
+    }
+  };
+
+  const toggleSelectInvoice = (id: string) => {
+    setSelectedInvoiceIds(prev => 
+      prev.includes(id) ? prev.filter(invId => invId !== id) : [...prev, id]
+    );
+  };
+
   const handlePrintInvoice = async (invoiceToPrint?: any) => {
     // Si appelé depuis le bouton du tableau, on utilise invoiceToPrint. Sinon selectedInvoice (modal).
     // Eviter les problèmes d'événement pour le click: on prend l'événement optionnellement.
@@ -243,7 +287,7 @@ export default function FacturationPage() {
           <title>Facture ${invoice.invoice_number}</title>
           <style>
             @page {
-              size: 148mm 210mm; /* A5 Portrait exact */
+              size: A5 portrait; /* Force le navigateur à sélectionner A5 */
               margin: 10mm;
             }
             body { 
@@ -795,12 +839,22 @@ export default function FacturationPage() {
           <h2 className="text-2xl font-bold text-gray-800">Facturation</h2>
           <p className="text-sm text-gray-500">Gérez vos factures de vente et devis.</p>
         </div>
-        <button 
-          onClick={handleOpenModal}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow-md transition transform hover:-translate-y-0.5 text-sm font-medium flex items-center"
-        >
-          <Plus className="h-4 w-4 mr-2" /> Créer une Facture
-        </button>
+        <div className="flex gap-3">
+          {selectedInvoiceIds.length > 0 && user?.role === "Admin" && (
+            <button 
+              onClick={handleBulkDelete}
+              className="bg-red-50 hover:bg-red-100 text-red-600 px-4 py-2 rounded-lg shadow-sm border border-red-200 transition text-sm font-medium flex items-center"
+            >
+              <Trash2 className="h-4 w-4 mr-2" /> Supprimer ({selectedInvoiceIds.length})
+            </button>
+          )}
+          <button 
+            onClick={handleOpenModal}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow-md transition transform hover:-translate-y-0.5 text-sm font-medium flex items-center"
+          >
+            <Plus className="h-4 w-4 mr-2" /> Créer une Facture
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
@@ -841,6 +895,14 @@ export default function FacturationPage() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
+                <th className="px-6 py-4 font-medium w-12">
+                  <input 
+                    type="checkbox" 
+                    checked={selectedInvoiceIds.length === filtered.length && filtered.length > 0}
+                    onChange={toggleSelectAll}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                </th>
                 <th className="px-6 py-4 font-medium">N° Facture</th>
                 <th className="px-6 py-4 font-medium">Client</th>
                 <th className="px-6 py-4 font-medium">Date</th>
@@ -851,10 +913,18 @@ export default function FacturationPage() {
             </thead>
             <tbody className="text-sm divide-y divide-gray-100">
               {isLoading ? (
-                <tr><td colSpan={6} className="px-6 py-8 text-center text-gray-500">Chargement...</td></tr>
+                <tr><td colSpan={7} className="px-6 py-8 text-center text-gray-500">Chargement...</td></tr>
               ) : filtered.length > 0 ? (
                 filtered.map((item) => (
                   <tr key={item.id} className="hover:bg-gray-50 transition">
+                    <td className="px-6 py-4">
+                      <input 
+                        type="checkbox" 
+                        checked={selectedInvoiceIds.includes(item.id)}
+                        onChange={() => toggleSelectInvoice(item.id)}
+                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                    </td>
                     <td className="px-6 py-4 font-semibold text-slate-700">{item.invoice_number}</td>
                     <td className="px-6 py-4 font-semibold text-gray-900">{item.clients?.name || 'Client inconnu'}</td>
                     <td className="px-6 py-4 text-gray-600">
@@ -911,7 +981,7 @@ export default function FacturationPage() {
                 ))
               ) : (
                 <tr>
-                  <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
                     Aucune facture trouvée.
                   </td>
                 </tr>

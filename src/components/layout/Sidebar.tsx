@@ -36,8 +36,10 @@ export default function Sidebar() {
     "Principal": true,
     "Gestion": true,
     "Stock": true,
+    "Vente": true,
     "Comptabilité": true,
     "Administration": true,
+    "Paramètre": true,
   });
 
   const toggleGroup = (group: string) => {

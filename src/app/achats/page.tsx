@@ -80,7 +80,7 @@ export default function AchatsPage() {
     setIsLoading(true);
     const { data, error } = await supabase
       .from("purchases")
-      .select(`*, fournisseurs(name), creator:app_users!purchases_created_by_fkey(full_name), updater:app_users!purchases_updated_by_fkey(full_name)`)
+      .select(`*, fournisseurs(*), creator:app_users!purchases_created_by_fkey(full_name), updater:app_users!purchases_updated_by_fkey(full_name)`)
       .order("created_at", { ascending: false });
       
     if (!error && data) setPurchases(data as any);
@@ -206,14 +206,14 @@ export default function AchatsPage() {
         <body>
           <div class="header">
             <div class="company-info" style="width: 55%;">
-              <div style="font-size: 24px; font-weight: bold; text-transform: uppercase; margin-bottom: 5px;">${settings?.company_name || 'GECKO NEGOCE'}</div>
+              ${settings?.company_name ? `<div style="font-size: 24px; font-weight: bold; text-transform: uppercase; margin-bottom: 5px;">${settings.company_name}</div>` : ''}
               <div style="font-size: 10px;">
-                <p style="margin: 1px 0;">SARL au capital de ${settings?.capital || '1.000.000 F CFA'}</p>
-                <p style="margin: 1px 0;">R.C.CM / C.C. N° ${settings?.rcc || '1234567 A'}</p>
-                <p style="margin: 1px 0;">${settings?.address || 'Adresse de l\'entreprise / Ville'}</p>
-                <p style="margin: 1px 0;">Tél : ${settings?.phone || '+225 00 00 00 00 00'}</p>
-                <p style="margin: 1px 0;">Email : ${settings?.email || 'contact@entreprise.com'}</p>
-                <p style="margin: 1px 0;">Banque : ${settings?.bank_account || 'NOM DE LA BANQUE CI 000 0000 00000000 00'}</p>
+                ${settings?.capital ? `<p style="margin: 1px 0;">SARL au capital de ${settings.capital}</p>` : ''}
+                ${settings?.rcc ? `<p style="margin: 1px 0;">R.C.CM / C.C. N° ${settings.rcc}</p>` : ''}
+                ${settings?.address ? `<p style="margin: 1px 0;">${settings.address}</p>` : ''}
+                ${settings?.phone ? `<p style="margin: 1px 0;">Tél : ${settings.phone}</p>` : ''}
+                ${settings?.email ? `<p style="margin: 1px 0;">Email : ${settings.email}</p>` : ''}
+                ${settings?.bank_account ? `<p style="margin: 1px 0;">Banque : ${settings.bank_account}</p>` : ''}
               </div>
             </div>
             <div style="text-align: right; width: 40%;">

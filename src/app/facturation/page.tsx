@@ -77,7 +77,7 @@ export default function FacturationPage() {
     setIsLoading(true);
     const { data, error } = await supabase
       .from("invoices")
-      .select(`*, clients(name), creator:app_users!invoices_created_by_fkey(full_name), updater:app_users!invoices_updated_by_fkey(full_name)`)
+      .select(`*, clients(*), creator:app_users!invoices_created_by_fkey(full_name), updater:app_users!invoices_updated_by_fkey(full_name)`)
       .order("created_at", { ascending: false });
       
     if (!error && data) setInvoices(data as any);
@@ -180,12 +180,61 @@ export default function FacturationPage() {
     const calcTotalHT = linesToPrint.reduce((acc: number, l: any) => acc + (l.total_ht || (l.quantity * (l.unit_price || l.unit_price_ht || 0))), 0);
     const calcTotalTTC = linesToPrint.reduce((acc: number, l: any) => {
       const ht = (l.total_ht || (l.quantity * (l.unit_price || l.unit_price_ht || 0)));
-      const vat = l.tax_amount !== undefined ? l.tax_amount : (ht * (l.vat_rate ?? 18) / 100);
+      const vat = (l.tax_amount !== undefined && l.tax_amount !== null) ? l.tax_amount : (ht * (l.vat_rate ?? 18) / 100);
       return acc + (l.total_ttc || (ht + vat));
     }, 0);
     
     const displayTotalHT = invoice.total_ht || calcTotalHT;
     const displayTotalTTC = invoice.total_ttc || calcTotalTTC;
+
+    const numberToWords = (num: number): string => {
+      if (!num || isNaN(num) || num === 0) return "zéro";
+      const units = ["", "un", "deux", "trois", "quatre", "cinq", "six", "sept", "huit", "neuf", "dix", "onze", "douze", "treize", "quatorze", "quinze", "seize", "dix-sept", "dix-huit", "dix-neuf"];
+      const tens = ["", "dix", "vingt", "trente", "quarante", "cinquante", "soixante", "soixante-dix", "quatre-vingt", "quatre-vingt-dix"];
+      
+      const convertLessThan1000 = (n: number): string => {
+        if (n === 0) return "";
+        let res = "";
+        if (n >= 100) {
+          res += (Math.floor(n/100) > 1 ? units[Math.floor(n/100)] + " cent " : "cent ");
+          n %= 100;
+        }
+        if (n > 0) {
+          if (n < 20) res += units[n] + " ";
+          else {
+            let t = Math.floor(n/10);
+            let u = n % 10;
+            if (t === 7 || t === 9) {
+              res += tens[t-1] + "-" + units[10+u] + " ";
+            } else {
+              res += tens[t] + (u === 1 && t !== 8 ? " et un " : (u > 0 ? "-" + units[u] + " " : " "));
+            }
+          }
+        }
+        return res;
+      };
+      
+      let result = "";
+      let tempNum = Math.floor(num);
+      if (Math.floor(tempNum / 1000000000) > 0) {
+        result += convertLessThan1000(Math.floor(tempNum / 1000000000)) + "milliard ";
+        tempNum %= 1000000000;
+      }
+      if (Math.floor(tempNum / 1000000) > 0) {
+        result += convertLessThan1000(Math.floor(tempNum / 1000000)) + "million ";
+        tempNum %= 1000000;
+      }
+      if (Math.floor(tempNum / 1000) > 0) {
+        let thousands = Math.floor(tempNum / 1000);
+        if (thousands === 1) result += "mille ";
+        else result += convertLessThan1000(thousands) + "mille ";
+        tempNum %= 1000;
+      }
+      result += convertLessThan1000(tempNum);
+      return result.trim() + " FRANCS CFA";
+    };
+
+    const amountInWords = numberToWords(displayTotalTTC).toUpperCase();
 
     const html = `
       <!DOCTYPE html>
@@ -317,72 +366,19 @@ export default function FacturationPage() {
               display: none;
             }
           </style>
-          <script>
-            // Convertisseur simple de nombres en lettres pour FCFA
-            function numberToWords(num) {
-              if (num === 0) return "zéro";
-              const units = ["", "un", "deux", "trois", "quatre", "cinq", "six", "sept", "huit", "neuf", "dix", "onze", "douze", "treize", "quatorze", "quinze", "seize", "dix-sept", "dix-huit", "dix-neuf"];
-              const tens = ["", "dix", "vingt", "trente", "quarante", "cinquante", "soixante", "soixante-dix", "quatre-vingt", "quatre-vingt-dix"];
-              
-              function convertLessThan1000(n) {
-                if (n === 0) return "";
-                let res = "";
-                if (n >= 100) {
-                  res += (Math.floor(n/100) > 1 ? units[Math.floor(n/100)] + " cent " : "cent ");
-                  n %= 100;
-                }
-                if (n > 0) {
-                  if (n < 20) res += units[n] + " ";
-                  else {
-                    let t = Math.floor(n/10);
-                    let u = n % 10;
-                    if (t === 7 || t === 9) {
-                      res += tens[t-1] + "-" + units[10+u] + " ";
-                    } else {
-                      res += tens[t] + (u === 1 && t !== 8 ? " et un " : (u > 0 ? "-" + units[u] + " " : " "));
-                    }
-                  }
-                }
-                return res;
-              }
-              
-              let result = "";
-              if (Math.floor(num / 1000000000) > 0) {
-                result += convertLessThan1000(Math.floor(num / 1000000000)) + "milliard ";
-                num %= 1000000000;
-              }
-              if (Math.floor(num / 1000000) > 0) {
-                result += convertLessThan1000(Math.floor(num / 1000000)) + "million ";
-                num %= 1000000;
-              }
-              if (Math.floor(num / 1000) > 0) {
-                let thousands = Math.floor(num / 1000);
-                if (thousands === 1) result += "mille ";
-                else result += convertLessThan1000(thousands) + "mille ";
-                num %= 1000;
-              }
-              result += convertLessThan1000(num);
-              return result.trim() + " FRANCS CFA";
-            }
-            
-            window.onload = function() {
-              const amount = ${displayTotalTTC};
-              document.getElementById('amount-words').innerText = "ARRÊTÉE À LA SOMME DE : " + numberToWords(amount);
-            };
-          </script>
         </head>
         <body>
           
           <div class="header">
             <div class="company-info">
-              <div class="company-name">${settings?.company_name || 'GECKO NEGOCE'}</div>
+              ${settings?.company_name ? `<div class="company-name">${settings.company_name}</div>` : ''}
               <div class="company-details">
-                <p>SARL au capital de ${settings?.capital || '1.000.000 F CFA'}</p>
-                <p>R.C.CM / C.C. N° ${settings?.rcc || '1234567 A'}</p>
-                <p>${settings?.address || 'Adresse de l\'entreprise / Ville'}</p>
-                <p>Tél : ${settings?.phone || '+225 00 00 00 00 00'}</p>
-                <p>Email : ${settings?.email || 'contact@entreprise.com'}</p>
-                <p>Banque : ${settings?.bank_account || 'NOM DE LA BANQUE CI 000 0000 00000000 00'}</p>
+                ${settings?.capital ? `<p>SARL au capital de ${settings.capital}</p>` : ''}
+                ${settings?.rcc ? `<p>R.C.CM / C.C. N° ${settings.rcc}</p>` : ''}
+                ${settings?.address ? `<p>${settings.address}</p>` : ''}
+                ${settings?.phone ? `<p>Tél : ${settings.phone}</p>` : ''}
+                ${settings?.email ? `<p>Email : ${settings.email}</p>` : ''}
+                ${settings?.bank_account ? `<p>Banque : ${settings.bank_account}</p>` : ''}
               </div>
             </div>
             
@@ -393,9 +389,11 @@ export default function FacturationPage() {
               </div>
               <div class="client-box">
                 <p style="font-weight: bold; margin-bottom: 5px;">DOIT : ${invoice.clients?.name || invoice.client_code || 'Client'}</p>
-                <p>Adresse Client</p>
-                <p>CC : ${invoice.clients?.cc || 'Non renseigné'}</p>
-                <p>RC : ${invoice.clients?.rc || 'Non renseigné'}</p>
+                ${invoice.clients?.address ? `<p>${invoice.clients.address}</p>` : ''}
+                ${invoice.clients?.phone ? `<p>Tél : ${invoice.clients.phone}</p>` : ''}
+                ${invoice.clients?.email ? `<p>Email : ${invoice.clients.email}</p>` : ''}
+                ${invoice.clients?.cc ? `<p>CC : ${invoice.clients.cc}</p>` : ''}
+                ${invoice.clients?.rc ? `<p>RC : ${invoice.clients.rc}</p>` : ''}
               </div>
             </div>
           </div>
@@ -420,16 +418,24 @@ export default function FacturationPage() {
               </tr>
             </thead>
             <tbody>
-              ${(linesToPrint || []).map((line: any) => `
+              ${(linesToPrint || []).map((line: any) => {
+                const lineHt = line.total_ht || (line.quantity * (line.unit_price || line.unit_price_ht || 0));
+                const lineVat = (line.tax_amount !== undefined && line.tax_amount !== null) ? line.tax_amount : (lineHt * (line.vat_rate ?? 18) / 100);
+                const lineTtc = line.total_ttc || (lineHt + lineVat);
+                const unitHt = line.unit_price || line.unit_price_ht || 0;
+                const unitTtc = line.quantity > 0 ? (lineTtc / line.quantity) : 0;
+                
+                return `
                 <tr>
                   <td class="text-center">${line.article_code}</td>
                   <td>${line.designation || line.articles?.designation || ''}</td>
                   <td class="text-center">${line.quantity}</td>
-                  <td class="text-right">${Number(line.unit_price || line.unit_price_ht || 0).toLocaleString('fr-FR')}</td>
-                  <td class="text-right">${Number((line.unit_price || line.unit_price_ht || 0) * (1 + (line.vat_rate ?? 18) / 100)).toLocaleString('fr-FR')}</td>
-                  <td class="text-right font-bold">${Number(line.total_ht || 0).toLocaleString('fr-FR')}</td>
+                  <td class="text-right">${Number(unitHt).toLocaleString('fr-FR')}</td>
+                  <td class="text-right">${Number(unitTtc).toLocaleString('fr-FR')}</td>
+                  <td class="text-right font-bold">${Number(lineHt).toLocaleString('fr-FR')}</td>
                 </tr>
-              `).join('')}
+                `;
+              }).join('')}
               <tr style="height: 50px;">
                 <td></td><td></td><td></td><td></td><td></td><td></td>
               </tr>
@@ -475,7 +481,7 @@ export default function FacturationPage() {
           </div>
 
           <div class="footer">
-            <p class="amount-words">Facture certifiée sincère et conforme à nos livres <span id="amount-words">ARRÊTÉE À LA SOMME DE : ...</span></p>
+            <p class="amount-words">Facture certifiée sincère et conforme à nos livres <span id="amount-words">ARRÊTÉE À LA SOMME DE : ${amountInWords}</span></p>
             <p class="conditions">Nos marchandises ne sont ni reprises ni échangées et voyagent aux risques et périls du destinataire. Les prix sont établis en fonction du tarif à la date de la présente et sont sujets de modification.</p>
             
             ${invoice.observations ? `

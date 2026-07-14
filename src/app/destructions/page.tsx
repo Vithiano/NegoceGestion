@@ -269,14 +269,14 @@ export default function DestructionsPage() {
         <body>
           <div class="header">
             <div class="company-info">
-              <div class="company-name">${settings?.company_name || 'GECKO NEGOCE'}</div>
+              ${settings?.company_name ? `<div class="company-name">${settings.company_name}</div>` : ''}
               <div class="company-details">
-                <p>SARL au capital de ${settings?.capital || '1.000.000 F CFA'}</p>
-                <p>R.C.CM / C.C. N° ${settings?.rcc || '1234567 A'}</p>
-                <p>${settings?.address || 'Adresse de l\'entreprise / Ville'}</p>
-                <p>Tél : ${settings?.phone || '+225 00 00 00 00 00'}</p>
-                <p>Email : ${settings?.email || 'contact@entreprise.com'}</p>
-                <p>Banque : ${settings?.bank_account || 'NOM DE LA BANQUE CI 000 0000 00000000 00'}</p>
+                ${settings?.capital ? `<p>SARL au capital de ${settings.capital}</p>` : ''}
+                ${settings?.rcc ? `<p>R.C.CM / C.C. N° ${settings.rcc}</p>` : ''}
+                ${settings?.address ? `<p>${settings.address}</p>` : ''}
+                ${settings?.phone ? `<p>Tél : ${settings.phone}</p>` : ''}
+                ${settings?.email ? `<p>Email : ${settings.email}</p>` : ''}
+                ${settings?.bank_account ? `<p>Banque : ${settings.bank_account}</p>` : ''}
               </div>
             </div>
             

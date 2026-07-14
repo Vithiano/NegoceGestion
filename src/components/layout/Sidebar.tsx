@@ -76,6 +76,7 @@ export default function Sidebar() {
     { href: "/comptabilite/paiements", icon: CreditCard, label: "Trésorerie / Paiements", group: "Comptabilité" },
     { href: "/comptabilite/journal", icon: BookOpen, label: "Journal Comptable", group: "Comptabilité" },
     { href: "/comptabilite/comptes", icon: Wallet, label: "Plan Comptable", group: "Comptabilité" },
+    { href: "/comptabilite/ca-tva", icon: BarChart, label: "CA par Taux de TVA/AIRSI", group: "Comptabilité" },
     { href: "/clients", icon: Users, label: "Clients", group: "Gestion" },
     { href: "/fournisseurs", icon: Briefcase, label: "Fournisseurs", group: "Gestion" },
     { href: "/admin/utilisateurs", icon: Users, label: "Utilisateurs & Groupes", group: "Paramètre" },

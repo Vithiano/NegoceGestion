@@ -46,6 +46,7 @@ export default function FacturationPage() {
   const [issueDate, setIssueDate] = useState(new Date().toISOString().split('T')[0]);
   const [dueDate, setDueDate] = useState("");
   const [observations, setObservations] = useState("");
+  const [invoiceType, setInvoiceType] = useState<"FACTURE" | "AVOIR">("FACTURE");
   const [lines, setLines] = useState<any[]>([]);
 
   // Mini-form states for adding lines
@@ -106,6 +107,7 @@ export default function FacturationPage() {
 
   const handleOpenModal = () => {
     setEditingInvoiceId(null);
+    setInvoiceType("FACTURE");
     setClientCode("");
     setIssueDate(new Date().toISOString().split('T')[0]);
     const defaultDue = new Date();
@@ -124,6 +126,7 @@ export default function FacturationPage() {
   };
 
   const handleEditInvoice = async (invoice: any) => {
+    setInvoiceType(invoice.invoice_number?.startsWith("AV-") ? "AVOIR" : "FACTURE");
     const { data } = await supabase.from("invoice_lines").select("*, articles(designation)").eq("invoice_id", invoice.id).order('id');
     
     const formattedData = (data || []).map((line: any) => ({
@@ -278,7 +281,7 @@ export default function FacturationPage() {
       return result.trim() + " FRANCS CFA";
     };
 
-    const amountInWords = numberToWords(displayTotalTTC).toUpperCase();
+    const amountInWords = numberToWords(Math.abs(displayTotalTTC)).toUpperCase();
 
     const html = `
       <!DOCTYPE html>
@@ -443,7 +446,7 @@ export default function FacturationPage() {
           </div>
           
           <div class="invoice-title">
-            <h2>FACTURE</h2>
+            <h2>${invoice.invoice_number?.startsWith("AV-") ? "FACTURE D'AVOIR" : "FACTURE"}</h2>
             <h3>N° : ${invoice.invoice_number}</h3>
           </div>
 
@@ -473,10 +476,10 @@ export default function FacturationPage() {
                 <tr>
                   <td class="text-center">${line.article_code}</td>
                   <td>${line.designation || line.articles?.designation || ''}</td>
-                  <td class="text-center">${line.quantity}</td>
-                  <td class="text-right">${Number(unitHt).toLocaleString('fr-FR')}</td>
-                  <td class="text-right">${Number(unitTtc).toLocaleString('fr-FR')}</td>
-                  <td class="text-right font-bold">${Number(lineHt).toLocaleString('fr-FR')}</td>
+                  <td class="text-center">${Math.abs(line.quantity)}</td>
+                  <td class="text-right">${Number(Math.abs(unitHt)).toLocaleString('fr-FR')}</td>
+                  <td class="text-right">${Number(Math.abs(unitTtc)).toLocaleString('fr-FR')}</td>
+                  <td class="text-right font-bold">${Number(Math.abs(lineHt)).toLocaleString('fr-FR')}</td>
                 </tr>
                 `;
               }).join('')}
@@ -499,8 +502,8 @@ export default function FacturationPage() {
                 <tbody>
                   <tr>
                     <td class="text-center">TVA</td>
-                    <td class="text-right">${Number(displayTotalHT).toLocaleString('fr-FR')}</td>
-                    <td class="text-right">${Number(displayTotalTTC - displayTotalHT).toLocaleString('fr-FR')}</td>
+                    <td class="text-right">${Number(Math.abs(displayTotalHT)).toLocaleString('fr-FR')}</td>
+                    <td class="text-right">${Number(Math.abs(displayTotalTTC - displayTotalHT)).toLocaleString('fr-FR')}</td>
                   </tr>
                 </tbody>
               </table>
@@ -648,8 +651,9 @@ export default function FacturationPage() {
     });
   };
 
-  const totalHT = lines.reduce((sum, line) => sum + (line.total_ht || 0), 0);
-  const totalVAT = lines.reduce((sum, line) => sum + ((line.total_ht || 0) * ((line.vat_rate ?? 18) / 100)), 0);
+  const multiplier = invoiceType === "AVOIR" ? -1 : 1;
+  const totalHT = lines.reduce((sum, line) => sum + (line.total_ht || 0), 0) * multiplier;
+  const totalVAT = lines.reduce((sum, line) => sum + ((line.total_ht || 0) * ((line.vat_rate ?? 18) / 100)), 0) * multiplier;
   const totalTTC = totalHT + totalVAT;
 
   const handleSave = async (status: "DRAFT" | "VALIDATED") => {
@@ -701,7 +705,7 @@ export default function FacturationPage() {
         // 2. Formatage du numéro de facture
         const yyyy = new Date().getFullYear().toString();
         const mm = (new Date().getMonth() + 1).toString().padStart(2, '0');
-        const prefix = `FAC-${yyyy}${mm}-`;
+        const prefix = invoiceType === "AVOIR" ? `AV-${yyyy}${mm}-` : `FAC-${yyyy}${mm}-`;
         
         const { data: lastInvoice } = await supabase
           .from('invoices')
@@ -740,13 +744,14 @@ export default function FacturationPage() {
       }
 
       // 4. Insertion des lignes
+      const insertMultiplier = invoiceType === "AVOIR" ? -1 : 1;
       const linesToInsert = lines.map((l, i) => {
-        const ht = l.total_ht || (l.quantity * l.unit_price);
+        const ht = (l.total_ht || (l.quantity * l.unit_price)) * insertMultiplier;
         const vat = l.vat_rate ?? 18;
         return {
           invoice_id: invoiceId,
           article_code: l.article_code,
-          quantity: l.quantity,
+          quantity: l.quantity * insertMultiplier,
           unit_price_ht: l.unit_price,
           tax_amount: (ht * (vat / 100)),
           total_ttc: ht + (ht * (vat / 100))
@@ -925,12 +930,17 @@ export default function FacturationPage() {
                         className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                       />
                     </td>
-                    <td className="px-6 py-4 font-semibold text-slate-700">{item.invoice_number}</td>
+                    <td className="px-6 py-4 font-semibold text-slate-700">
+                      {item.invoice_number}
+                      {item.invoice_number?.startsWith("AV-") && (
+                        <span className="ml-2 px-2 py-0.5 bg-orange-100 text-orange-700 text-xs rounded-full font-bold">AVOIR</span>
+                      )}
+                    </td>
                     <td className="px-6 py-4 font-semibold text-gray-900">{item.clients?.name || 'Client inconnu'}</td>
                     <td className="px-6 py-4 text-gray-600">
                       {new Date(item.date).toLocaleDateString('fr-FR')}
                     </td>
-                    <td className="px-6 py-4 text-right font-bold text-gray-800">
+                    <td className={`px-6 py-4 text-right font-bold ${item.total_ttc < 0 ? "text-orange-600" : "text-gray-800"}`}>
                       {(item.total_ttc || 0).toLocaleString('fr-FR')}
                     </td>
                     <td className="px-6 py-4 text-center">
@@ -1014,7 +1024,19 @@ export default function FacturationPage() {
                 <h3 className="text-sm font-bold text-gray-800 mb-4 flex items-center uppercase tracking-wider">
                   <FileText className="h-4 w-4 mr-2 text-blue-600" /> Informations Générales
                 </h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Type *</label>
+                    <select
+                      value={invoiceType}
+                      onChange={(e) => setInvoiceType(e.target.value as "FACTURE" | "AVOIR")}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white hover:bg-gray-50 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition"
+                      disabled={!!editingInvoiceId}
+                    >
+                      <option value="FACTURE">Facture Standard</option>
+                      <option value="AVOIR">Facture d'Avoir</option>
+                    </select>
+                  </div>
                   <div className="space-y-1">
                     <label className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Client *</label>
                     <button 

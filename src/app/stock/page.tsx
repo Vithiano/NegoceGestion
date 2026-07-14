@@ -68,7 +68,7 @@ export default function StockPage() {
       purchase_price: article.purchase_price,
       sale_price_ht: article.sale_price_ht,
       min_stock: article.min_stock,
-      tax_rate: article.tax_rate || 18,
+      tax_rate: article.tax_rate ?? 18,
       is_active: article.is_active !== false
     });
     setIsEditing(true);

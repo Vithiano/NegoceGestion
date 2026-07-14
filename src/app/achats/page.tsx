@@ -56,6 +56,7 @@ export default function AchatsPage() {
   const [currentDesignation, setCurrentDesignation] = useState("");
   const [currentQuantity, setCurrentQuantity] = useState<number>(1);
   const [currentPrice, setCurrentPrice] = useState<number>(0);
+  const [currentVatRate, setCurrentVatRate] = useState<number>(18);
   const [editingLineId, setEditingLineId] = useState<number | null>(null);
 
   // CRUD states
@@ -318,6 +319,7 @@ export default function AchatsPage() {
     setCurrentDesignation(article.designation);
     setCurrentPrice(article.purchase_price || 0);
     setCurrentQuantity(1);
+    setCurrentVatRate(article.tax_rate !== undefined ? article.tax_rate : 18);
     
     setIsArticleModalOpen(false);
     setArticleSearch("");
@@ -339,8 +341,8 @@ export default function AchatsPage() {
       designation: currentDesignation,
       quantity: currentQuantity,
       unit_price_ht: currentPrice,
-      tax_amount: (currentPrice * currentQuantity) * 0.18, // 18% par défaut
-      total_ttc: (currentPrice * currentQuantity) * 1.18
+      tax_amount: (currentPrice * currentQuantity) * (currentVatRate / 100),
+      total_ttc: (currentPrice * currentQuantity) * (1 + (currentVatRate / 100))
     };
 
     if (editingLineId) {
@@ -354,6 +356,7 @@ export default function AchatsPage() {
     setCurrentDesignation("");
     setCurrentQuantity(1);
     setCurrentPrice(0);
+    setCurrentVatRate(18);
     setEditingLineId(null);
     return true;
   };
@@ -375,6 +378,12 @@ export default function AchatsPage() {
     setCurrentDesignation(line.designation);
     setCurrentQuantity(line.quantity);
     setCurrentPrice(line.unit_price_ht);
+    
+    const calculatedVatRate = line.tax_amount && line.quantity && line.unit_price_ht 
+      ? Math.round((line.tax_amount / (line.quantity * line.unit_price_ht)) * 100) 
+      : 18;
+    setCurrentVatRate(calculatedVatRate);
+    
     setEditingLineId(line.id);
     setIsAddLineModalOpen(true);
   };
@@ -891,7 +900,7 @@ export default function AchatsPage() {
                       <span className="font-medium">{totalHT.toLocaleString('fr-FR')} FCFA</span>
                     </div>
                     <div className="flex justify-between text-sm">
-                      <span className="text-slate-400">TVA (18%)</span>
+                      <span className="text-slate-400">TVA</span>
                       <span className="font-medium">{totalVAT.toLocaleString('fr-FR')} FCFA</span>
                     </div>
                     <div className="pt-3 border-t border-slate-600 flex justify-between items-center">
@@ -953,7 +962,7 @@ export default function AchatsPage() {
                 </button>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="space-y-1">
                   <label className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Quantité *</label>
                   <input 
@@ -974,8 +983,33 @@ export default function AchatsPage() {
                     className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none" 
                   />
                 </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-gray-600 uppercase tracking-wider">TVA (%) *</label>
+                  <input 
+                    type="number" 
+                    required min="0" max="100"
+                    value={currentVatRate}
+                    onChange={(e) => setCurrentVatRate(Number(e.target.value))}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none" 
+                  />
+                </div>
               </div>
               
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mt-2">
+                <div className="flex justify-between items-center text-sm mb-1">
+                  <span className="text-slate-500">Total HT</span>
+                  <span className="font-semibold text-slate-700">{(currentQuantity * currentPrice).toLocaleString('fr-FR')} FCFA</span>
+                </div>
+                <div className="flex justify-between items-center text-sm mb-2">
+                  <span className="text-slate-500">TVA ({currentVatRate}%)</span>
+                  <span className="font-semibold text-slate-700">{((currentQuantity * currentPrice) * (currentVatRate / 100)).toLocaleString('fr-FR')} FCFA</span>
+                </div>
+                <div className="flex justify-between items-center pt-2 border-t border-slate-200">
+                  <span className="font-bold text-slate-800">TOTAL TTC</span>
+                  <span className="font-bold text-lg text-blue-600">{((currentQuantity * currentPrice) * (1 + currentVatRate / 100)).toLocaleString('fr-FR')} FCFA</span>
+                </div>
+              </div>
+
               {/* Submission button hidden so Enter key works seamlessly */}
               <button type="submit" className="hidden">Submit</button>
             </form>

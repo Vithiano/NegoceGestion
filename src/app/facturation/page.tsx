@@ -53,6 +53,7 @@ export default function FacturationPage() {
   const [currentDesignation, setCurrentDesignation] = useState("");
   const [currentQuantity, setCurrentQuantity] = useState<number>(1);
   const [currentPrice, setCurrentPrice] = useState<number>(0);
+  const [currentVatRate, setCurrentVatRate] = useState<number>(18);
   const [editingLineId, setEditingLineId] = useState<number | null>(null);
 
   // CRUD states
@@ -129,7 +130,7 @@ export default function FacturationPage() {
       designation: line.articles?.designation,
       unit_price: line.unit_price_ht,
       total_ht: line.quantity * line.unit_price_ht,
-      vat_rate: 18
+      vat_rate: line.tax_amount && line.quantity * line.unit_price_ht ? Math.round((line.tax_amount / (line.quantity * line.unit_price_ht)) * 100) : 18
     }));
 
     setEditingInvoiceId(invoice.id);
@@ -177,7 +178,11 @@ export default function FacturationPage() {
 
     // Calcul de secours au cas où la facture a été mal sauvegardée précédemment
     const calcTotalHT = linesToPrint.reduce((acc: number, l: any) => acc + (l.total_ht || (l.quantity * (l.unit_price || l.unit_price_ht || 0))), 0);
-    const calcTotalTTC = linesToPrint.reduce((acc: number, l: any) => acc + (l.total_ttc || (l.total_ht || (l.quantity * (l.unit_price || l.unit_price_ht || 0))) * 1.18), 0);
+    const calcTotalTTC = linesToPrint.reduce((acc: number, l: any) => {
+      const ht = (l.total_ht || (l.quantity * (l.unit_price || l.unit_price_ht || 0)));
+      const vat = l.tax_amount !== undefined ? l.tax_amount : (ht * (l.vat_rate ?? 18) / 100);
+      return acc + (l.total_ttc || (ht + vat));
+    }, 0);
     
     const displayTotalHT = invoice.total_ht || calcTotalHT;
     const displayTotalTTC = invoice.total_ttc || calcTotalTTC;
@@ -421,7 +426,7 @@ export default function FacturationPage() {
                   <td>${line.designation || line.articles?.designation || ''}</td>
                   <td class="text-center">${line.quantity}</td>
                   <td class="text-right">${Number(line.unit_price || line.unit_price_ht || 0).toLocaleString('fr-FR')}</td>
-                  <td class="text-right">${Number((line.unit_price || line.unit_price_ht || 0) * 1.18).toLocaleString('fr-FR')}</td>
+                  <td class="text-right">${Number((line.unit_price || line.unit_price_ht || 0) * (1 + (line.vat_rate ?? 18) / 100)).toLocaleString('fr-FR')}</td>
                   <td class="text-right font-bold">${Number(line.total_ht || 0).toLocaleString('fr-FR')}</td>
                 </tr>
               `).join('')}
@@ -443,7 +448,7 @@ export default function FacturationPage() {
                 </thead>
                 <tbody>
                   <tr>
-                    <td class="text-center">TVA 18%</td>
+                    <td class="text-center">TVA</td>
                     <td class="text-right">${Number(displayTotalHT).toLocaleString('fr-FR')}</td>
                     <td class="text-right">${Number(displayTotalTTC - displayTotalHT).toLocaleString('fr-FR')}</td>
                   </tr>
@@ -521,6 +526,7 @@ export default function FacturationPage() {
     setCurrentDesignation(article.designation);
     setCurrentPrice(article.sale_price_ht || 0);
     setCurrentQuantity(1);
+    setCurrentVatRate(article.tax_rate !== undefined ? article.tax_rate : 18);
     
     setIsArticleModalOpen(false);
     setArticleSearch("");
@@ -536,16 +542,13 @@ export default function FacturationPage() {
       return false;
     }
 
-    const article = articles.find(a => a.code === currentArticleCode);
-    const vatRate = article?.tax_rate !== undefined ? article.tax_rate : 18;
-
     const newLine = {
       id: editingLineId || Date.now(),
       article_code: currentArticleCode,
       designation: currentDesignation,
       quantity: currentQuantity,
       unit_price: currentPrice,
-      vat_rate: vatRate,
+      vat_rate: currentVatRate,
       total_ht: currentQuantity * currentPrice
     };
 
@@ -560,6 +563,7 @@ export default function FacturationPage() {
     setCurrentDesignation("");
     setCurrentQuantity(1);
     setCurrentPrice(0);
+    setCurrentVatRate(18);
     setEditingLineId(null);
     return true;
   };
@@ -581,6 +585,7 @@ export default function FacturationPage() {
     setCurrentDesignation(line.designation || line.articles?.designation);
     setCurrentQuantity(line.quantity);
     setCurrentPrice(line.unit_price);
+    setCurrentVatRate(line.vat_rate ?? 18);
     setEditingLineId(line.id);
     setIsAddLineModalOpen(true);
   };
@@ -594,7 +599,7 @@ export default function FacturationPage() {
   };
 
   const totalHT = lines.reduce((sum, line) => sum + (line.total_ht || 0), 0);
-  const totalVAT = lines.reduce((sum, line) => sum + ((line.total_ht || 0) * ((line.vat_rate || 18) / 100)), 0);
+  const totalVAT = lines.reduce((sum, line) => sum + ((line.total_ht || 0) * ((line.vat_rate ?? 18) / 100)), 0);
   const totalTTC = totalHT + totalVAT;
 
   const handleSave = async (status: "DRAFT" | "VALIDATED") => {
@@ -687,7 +692,7 @@ export default function FacturationPage() {
       // 4. Insertion des lignes
       const linesToInsert = lines.map((l, i) => {
         const ht = l.total_ht || (l.quantity * l.unit_price);
-        const vat = l.vat_rate || 18;
+        const vat = l.vat_rate ?? 18;
         return {
           invoice_id: invoiceId,
           article_code: l.article_code,
@@ -1077,7 +1082,7 @@ export default function FacturationPage() {
                       <span className="font-medium">{totalHT.toLocaleString('fr-FR')} FCFA</span>
                     </div>
                     <div className="flex justify-between text-sm">
-                      <span className="text-slate-400">TVA (18%)</span>
+                      <span className="text-slate-400">TVA</span>
                       <span className="font-medium">{totalVAT.toLocaleString('fr-FR')} FCFA</span>
                     </div>
                     <div className="pt-3 border-t border-slate-600 flex justify-between items-center">
@@ -1239,7 +1244,7 @@ export default function FacturationPage() {
                 </button>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="space-y-1">
                   <label className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Quantité *</label>
                   <input 
@@ -1259,6 +1264,30 @@ export default function FacturationPage() {
                     onChange={(e) => setCurrentPrice(Number(e.target.value))}
                     className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none" 
                   />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-gray-600 uppercase tracking-wider">TVA (%) *</label>
+                  <input 
+                    type="number" 
+                    required min="0" max="100"
+                    value={currentVatRate}
+                    onChange={(e) => setCurrentVatRate(Number(e.target.value))}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none" 
+                  />
+                </div>
+              </div>
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mt-2">
+                <div className="flex justify-between items-center text-sm mb-1">
+                  <span className="text-slate-500">Total HT</span>
+                  <span className="font-semibold text-slate-700">{(currentQuantity * currentPrice).toLocaleString('fr-FR')} FCFA</span>
+                </div>
+                <div className="flex justify-between items-center text-sm mb-2">
+                  <span className="text-slate-500">TVA ({currentVatRate}%)</span>
+                  <span className="font-semibold text-slate-700">{((currentQuantity * currentPrice) * (currentVatRate / 100)).toLocaleString('fr-FR')} FCFA</span>
+                </div>
+                <div className="flex justify-between items-center pt-2 border-t border-slate-200">
+                  <span className="font-bold text-slate-800">TOTAL TTC</span>
+                  <span className="font-bold text-lg text-blue-600">{((currentQuantity * currentPrice) * (1 + currentVatRate / 100)).toLocaleString('fr-FR')} FCFA</span>
                 </div>
               </div>
               
